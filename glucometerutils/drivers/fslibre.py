@@ -129,9 +129,11 @@ def _parse_arresult(record):
         return common.TimeAdjustment(
             _extract_timestamp(parsed_record),
             _extract_timestamp(parsed_record, 'old_'),
-            device_id=parsed_record['device_id'])
+            device_id=parsed_record['device_id'],
+            raw_readout=record)
     else:
-        return None
+        return common.BasicReading(_extract_timestamp(parsed_record), device_id=parsed_record['device_id'],
+                                   raw_readout=record)
 
 
     # Check right away if we have rapid insulin
@@ -209,7 +211,8 @@ def _parse_arresult(record):
         value,
         comment='; '.join(comment_parts),
         measure_method=measure_method,
-        device_id=parsed_record['device_id'])
+        device_id=parsed_record['device_id'],
+        raw_readout=record)
 
 class Device(freestyle.FreeStyleHidDevice):
     """Glucometer driver for FreeStyle Libre devices."""
@@ -251,7 +254,8 @@ class Device(freestyle.FreeStyleHidDevice):
                 parsed_record['value'],
                 comment='(Sensor)',
                 measure_method=common.MeasurementMethod.CGM,
-                device_id=parsed_record['device_id']
+                device_id=parsed_record['device_id'],
+                raw_readout=record
             )
 
         # Then get the results of explicit scans and blood tests (and other
