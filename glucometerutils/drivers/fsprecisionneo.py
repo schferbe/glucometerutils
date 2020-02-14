@@ -9,14 +9,15 @@ untested.
 Supported features:
     - get readings;
     - get and set date and time;
-    - get serial number and software version.
+    - get serial number and software version;
+    - get and set patient name.
 
 Expected device path: /dev/hidraw9 or similar HID device. Optional when using
 HIDAPI.
 
 Further information on the device protocol can be found at
 
-https://flameeyes.github.io/glucometer-protocols/abbott/freestyle-precision-neo
+https://protocols.glucometers.tech/abbott/freestyle-precision-neo
 
 """
 
@@ -59,7 +60,8 @@ class Device(freestyle.FreeStyleHidDevice):
             serial_number=self.get_serial_number(),
             version_info=(
                 'Software version: ' + self._get_version(),),
-            native_unit=self.get_glucose_unit())
+            native_unit=self.get_glucose_unit(),
+            patient_name=self.get_patient_name())
 
     def get_glucose_unit(self):  # pylint: disable=no-self-use
         """Returns the glucose unit of the device."""
@@ -89,4 +91,10 @@ class Device(freestyle.FreeStyleHidDevice):
                 raw_reading.year + 2000, raw_reading.month, raw_reading.day,
                 raw_reading.hour, raw_reading.minute)
 
-            yield cls(timestamp, raw_reading.value)
+            if record and record[0] == _TYPE_KETONE_READING:
+                value = freestyle.convert_ketone_unit(raw_reading.value)
+            else:
+                value = raw_reading.value
+
+            yield cls(timestamp, value)
+

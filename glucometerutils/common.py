@@ -6,11 +6,7 @@
 import datetime
 import enum
 import textwrap
-
-try:
-    from typing import Sequence, Text
-except ImportError:
-    pass
+from typing import Optional, Sequence
 
 import attr
 
@@ -69,17 +65,17 @@ class BasicReading:
 @attr.s
 class GlucoseReading:
 
-    timestamp = attr.ib()  # type: datetime.datetime
-    value = attr.ib()  # type: float
+    timestamp = attr.ib(type=datetime.datetime)
+    value = attr.ib(type=float)
     meal = attr.ib(
-        default=Meal.NONE, validator=attr.validators.in_(Meal))  # type: Meal
-    comment = attr.ib(default='')  # type: Text
+        default=Meal.NONE, validator=attr.validators.in_(Meal),
+        type=Meal)
+    comment = attr.ib(default='', type=str)
     measure_method = attr.ib(
         default=MeasurementMethod.BLOOD_SAMPLE,
-        validator=attr.validators.in_(
-            MeasurementMethod)) # type: MeasurementMethod
-    device_id = attr.ib(default=None, kw_only=True)  # type: int
-    raw_readout = attr.ib(default=None, kw_only=True)
+        validator=attr.validators.in_(MeasurementMethod),
+        type=MeasurementMethod)
+    extra_data = attr.ib(factory=dict)
 
     def get_value_as(self, to_unit):
         # type: (Unit) -> float
@@ -91,7 +87,7 @@ class GlucoseReading:
         return convert_glucose_unit(self.value, Unit.MG_DL, to_unit)
 
     def as_csv(self, unit):
-        # type: (Unit) -> Text
+        # type: (Unit) -> str
         """Returns the reading as a formatted comma-separated value string."""
         return '"%s","%.2f","%s","%s","%s"' % (
             self.timestamp, self.get_value_as(unit), self.meal.value,
@@ -100,18 +96,17 @@ class GlucoseReading:
 @attr.s
 class KetoneReading:
 
-    timestamp = attr.ib()  # type: datetime.datetime
-    value = attr.ib()  # type: float
-    comment = attr.ib(default='')  # type: Text
-    device_id = attr.ib(default=None, kw_only=True)  # type: int
-    raw_readout = attr.ib(default=None, kw_only=True)
+    timestamp = attr.ib(type=datetime.datetime)
+    value = attr.ib(type=float)
+    comment = attr.ib(default='', type=str)
+    extra_data = attr.ib(factory=dict)
 
     def as_csv(self, unit):
         """Returns the reading as a formatted comma-separated value string."""
         del unit  # Unused for Ketone readings.
 
         return '"%s","%.2f","%s","%s"' % (
-            self.timestamp, self.value, MeasurementMethod.BLOOD_SAMPLE,
+            self.timestamp, self.value, MeasurementMethod.BLOOD_SAMPLE.value,
             self.comment)
 
 @attr.s
@@ -122,8 +117,7 @@ class TimeAdjustment:
         default=MeasurementMethod.TIME,
         validator=attr.validators.in_(
             MeasurementMethod))  # type: MeasurementMethod
-    device_id = attr.ib(default=None, kw_only=True)  # type: int
-    raw_readout = attr.ib(default=None, kw_only=True)
+    extra_data = attr.ib(factory=dict)
 
     def as_csv(self, unit):
         del unit
@@ -144,11 +138,13 @@ class MeterInfo:
         the device. It can include hardware and software version.
       native_unit: One of the Unit values to identify the meter native unit.
     """
-    model = attr.ib()  # Text
-    serial_number = attr.ib(default='N/A')  # Text
-    version_info = attr.ib(default=())  # Sequence[Text]
+    model = attr.ib(type=str)
+    serial_number = attr.ib(default='N/A', type=str)
+    version_info = attr.ib(default=(), type=Sequence[str])
     native_unit = attr.ib(
-        default=Unit.MG_DL, validator=attr.validators.in_(Unit))  # Unit
+        default=Unit.MG_DL, validator=attr.validators.in_(Unit),
+        type=Unit)
+    patient_name = attr.ib(default=None, type=Optional[str])
 
     def __str__(self):
         version_information_string = 'N/A'
@@ -156,7 +152,7 @@ class MeterInfo:
             version_information_string = '\n    '.join(
                 self.version_info).strip()
 
-        return textwrap.dedent("""\
+        base_output = textwrap.dedent("""\
             {model}
             Serial Number: {serial_number}
             Version Information:
@@ -165,3 +161,9 @@ class MeterInfo:
         """).format(model=self.model, serial_number=self.serial_number,
                     version_information_string=version_information_string,
                     native_unit=self.native_unit.value)
+
+        if self.patient_name != None:
+            base_output += 'Patient Name: {patient_name}\n'.format(
+                patient_name=self.patient_name)
+
+        return base_output

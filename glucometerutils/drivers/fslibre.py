@@ -6,14 +6,16 @@
 Supported features:
     - get readings (sensor, flash and blood glucose), including comments;
     - get and set date and time;
-    - get serial number and software version.
+    - get serial number and software version;
+    - get and set patient name;
+    - memory reset (caution!)
 
 Expected device path: /dev/hidraw9 or similar HID device. Optional when using
 HIDAPI.
 
 Further information on the device protocol can be found at
 
-https://flameeyes.github.io/glucometer-protocols/abbott/freestyle-libre
+https://protocols.glucometers.tech/abbott/freestyle-libre
 
 """
 
@@ -102,18 +104,6 @@ def _extract_timestamp(parsed_record, prefix=''):
         parsed_record[prefix + 'second'])
 
 
-def _convert_ketone_unit(raw_value):
-    """Convert raw ketone value as read in the device to its value in mmol/L.
-
-    As per
-    https://flameeyes.github.io/glucometer-protocols/abbott/freestyle-libre.html
-    this is actually not using any mg/dL→mmol/L conversion, but rather the same
-    as the meter uses for blood glucose.
-
-    """
-    return raw_value // 18
-
-
 def _parse_arresult(record):
     """Takes an array of string fields as input and parses it into a Reading."""
 
@@ -129,8 +119,8 @@ def _parse_arresult(record):
         return common.TimeAdjustment(
             _extract_timestamp(parsed_record),
             _extract_timestamp(parsed_record, 'old_'),
-            device_id=parsed_record['device_id'],
-            raw_readout=record)
+            extra_data={'device_id': parsed_record['device_id']},
+        )
     else:
         return common.BasicReading(_extract_timestamp(parsed_record), device_id=parsed_record['device_id'],
                                    raw_readout=record)
@@ -164,7 +154,7 @@ def _parse_arresult(record):
         measure_method = common.MeasurementMethod.BLOOD_SAMPLE
         cls = common.KetoneReading
         # automatically convert the raw value in mmol/L
-        value = _convert_ketone_unit(parsed_record['value'])
+        value = freestyle.convert_ketone_unit(parsed_record['value'])
     else:
         # unknown reading
         return None
@@ -211,8 +201,8 @@ def _parse_arresult(record):
         value,
         comment='; '.join(comment_parts),
         measure_method=measure_method,
-        device_id=parsed_record['device_id'],
-        raw_readout=record)
+        extra_data={'device_id': parsed_record['device_id']},
+    )
 
 class Device(freestyle.FreeStyleHidDevice):
     """Glucometer driver for FreeStyle Libre devices."""
@@ -226,7 +216,8 @@ class Device(freestyle.FreeStyleHidDevice):
             serial_number=self.get_serial_number(),
             version_info=(
                 'Software version: ' + self._get_version(),),
-            native_unit=self.get_glucose_unit())
+            native_unit=self.get_glucose_unit(),
+            patient_name=self.get_patient_name())
 
     def get_serial_number(self):
         """Overridden function as the command is not compatible."""
@@ -254,8 +245,7 @@ class Device(freestyle.FreeStyleHidDevice):
                 parsed_record['value'],
                 comment='(Sensor)',
                 measure_method=common.MeasurementMethod.CGM,
-                device_id=parsed_record['device_id'],
-                raw_readout=record
+                extra_data={'device_id': parsed_record['device_id']},
             )
 
         # Then get the results of explicit scans and blood tests (and other
@@ -264,3 +254,6 @@ class Device(freestyle.FreeStyleHidDevice):
             reading = _parse_arresult(record)
             if reading:
                 yield reading
+
+    def zero_log(self):
+        self._send_text_command(b'$resetpatient')
