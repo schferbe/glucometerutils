@@ -119,12 +119,11 @@ def _parse_arresult(record):
         return common.TimeAdjustment(
             _extract_timestamp(parsed_record),
             _extract_timestamp(parsed_record, 'old_'),
-            extra_data={'device_id': parsed_record['device_id']},
+            extra_data={'device_id': parsed_record['device_id'], "raw_readout": record},
         )
     else:
-        return common.BasicReading(_extract_timestamp(parsed_record), device_id=parsed_record['device_id'],
-                                   raw_readout=record)
-
+        return common.BasicReading(_extract_timestamp(parsed_record),
+                                   extra_data={'device_id': parsed_record['device_id'], "raw_readout": record})
 
     # Check right away if we have rapid insulin
     if parsed_record['rapid-acting-flag']:
@@ -195,14 +194,14 @@ def _parse_arresult(record):
         else:
             comment_parts.append('Rapid-acting insulin')
 
-
     return cls(
         _extract_timestamp(parsed_record),
         value,
         comment='; '.join(comment_parts),
         measure_method=measure_method,
-        extra_data={'device_id': parsed_record['device_id']},
+        extra_data={'device_id': parsed_record['device_id'], "raw_readout": record},
     )
+
 
 class Device(freestyle.FreeStyleHidDevice):
     """Glucometer driver for FreeStyle Libre devices."""

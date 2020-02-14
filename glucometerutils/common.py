@@ -55,8 +55,7 @@ def convert_glucose_unit(value, from_unit, to_unit):
 class BasicReading:
 
     timestamp = attr.ib()  # type: datetime.datetime
-    device_id = attr.ib(default=None, kw_only=True)  # type: int
-    raw_readout = attr.ib(default=None, kw_only=True)
+    extra_data = attr.ib(factory=dict)
 
     def as_csv(self, unit):
         return '"%s","","","%s"' % (self.timestamp, 'Not further classified')
